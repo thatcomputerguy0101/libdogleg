@@ -407,7 +407,7 @@ int main(int argc, char* argv[] )
   if(!check)
     fprintf(stderr, "SOLVING:\n");
 
-  double optimum;
+  double optimum = -1.;
   if(      solve_type == DOGLEG_SPARSE         )
     optimum = dogleg_optimize2(p, Nstate, Nmeasurements, Jnnz,
                                &optimizerCallback, &dogleg_parameters,
