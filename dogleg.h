@@ -317,9 +317,13 @@ void dogleg_testGradient(unsigned int var, const double* p0,
 void dogleg_testGradient_dense(unsigned int var, const double* p0,
                                unsigned int Nstate, unsigned int Nmeas,
                                dogleg_callback_dense_t* f, void* cookie);
+
+// This only kinda works. If J isn't constant, this will report gradient errors.
+// Interpret failures with caution
 void dogleg_testGradient_dense_products(unsigned int var, const double* p0,
                                         unsigned int Nstate, unsigned int Nmeas,
-                                        dogleg_callback_dense_products_t* f, void* cookie);
+                                        dogleg_callback_dense_products_t* f, void* cookie,
+                                        const dogleg_parameters2_t* parameters);
 
 // If we want to get the full solver state when we're done optimizing, we can
 // pass a non-NULL returnContext pointer to dogleg_optimize(). If we do this,

@@ -399,7 +399,9 @@ int main(int argc, char* argv[] )
       else if( solve_type == DOGLEG_DENSE          )
         dogleg_testGradient_dense(i, p, Nstate, Nmeasurements, &optimizerCallback_dense, NULL);
       else if( solve_type == DOGLEG_DENSE_PRODUCTS )
-        dogleg_testGradient_dense_products(i, p, Nstate, Nmeasurements, &optimizerCallback_dense_products, NULL);
+        dogleg_testGradient_dense_products(i, p, Nstate, Nmeasurements, &optimizerCallback_dense_products,
+                                           &dogleg_parameters,
+                                           &dogleg_parameters);
     }
     return 0;
   }

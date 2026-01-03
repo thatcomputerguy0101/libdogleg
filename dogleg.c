@@ -377,6 +377,8 @@ void _dogleg_testGradient(unsigned int var, const double* p0,
                           dogleg_callback_t*                f,
                           dogleg_callback_dense_t*          f_dense,
                           dogleg_callback_dense_products_t* f_dense_products,
+
+                          const dogleg_parameters2_t* parameters,
                           void* cookie)
 {
   double* x0 = malloc(Nmeas  * sizeof(double));
@@ -392,12 +394,22 @@ void _dogleg_testGradient(unsigned int var, const double* p0,
   cholmod_common _cholmod_common;
   cholmod_sparse* Jt;
   cholmod_sparse* Jt0;
-  double* J_dense  = NULL; // setting to NULL to pacify compiler's "uninitialized" warnings
-  double* J_dense0 = NULL; // setting to NULL to pacify compiler's "uninitialized" warnings
+  double* J_dense  = NULL;
+  double* J_dense0 = NULL;
 
+  // for dense_products
+  double* Jtx0 = NULL;
+  double* Jtx1 = NULL;
+  double* JtJ0 = NULL;
+  double* JtJ1 = NULL;
+  double norm2x0 = -1.;
+  double norm2x1 = -1.;
 
   // This is a plain text table, that can be easily parsed with "vnlog" tools
-  printf("# ivar imeasurement gradient_reported gradient_observed error error_relative\n");
+  if(f_dense_products == NULL)
+    printf("# ivar imeasurement gradient_reported gradient_observed error error_relative\n");
+  else
+    printf("# ivar ivar_evaluate gradient_reported gradient_observed error error_relative\n");
 
   if(f != NULL)
   {
@@ -439,10 +451,25 @@ void _dogleg_testGradient(unsigned int var, const double* p0,
   }
   else if(f_dense_products != NULL)
   {
-#warning "FINISH IMPLEMENTING DENSE_PRODUCTS\n"
-    // d(Jtx)/dp ~ Jt dx/dp ~ JtJ
-    fprintf(stderr, "FINISH IMPLEMENTING DENSE_PRODUCTS\n");
-    exit(1);
+    if(parameters->JtJ_packed)
+    {
+      SAY("ERROR: dense-product gradient checking is today only implemented for unpacked storage");
+      exit(1);
+    }
+    Jtx0 = malloc( Nstate * sizeof(Jtx0) );
+    Jtx1 = malloc( Nstate * sizeof(Jtx1) );
+    JtJ0 = malloc( Nstate*Nstate * sizeof(JtJ0) );
+    JtJ1 = malloc( Nstate*Nstate * sizeof(JtJ1) );
+
+    // d(norm2x)/dp = 2 xt J
+    // d(Jtx)/dp    = JtJ
+    //
+    // I check both
+    p[var] -= GRADTEST_DELTA/2.0;
+    (*f_dense_products)(p, &norm2x0, Jtx0, JtJ0, cookie);
+    p[var] += GRADTEST_DELTA;
+    (*f_dense_products)(p, &norm2x1, Jtx1, JtJ1, cookie);
+    p[var] -= GRADTEST_DELTA/2.0;
   }
   else
   {
@@ -451,28 +478,62 @@ void _dogleg_testGradient(unsigned int var, const double* p0,
   }
 
 
-  for(unsigned int i=0; i<Nmeas; i++)
+  if(f_dense_products == NULL)
   {
-    // estimated gradients at the midpoint between x and x0
-    double g_observed = (x[i] - x0[i]) / GRADTEST_DELTA;
-    double g_reported;
-    if(f != NULL)
-      g_reported = (getGrad(var, i, Jt0) + getGrad(var, i, Jt)) / 2.0;
-    else if(f_dense != NULL)
-      g_reported = (getGrad_dense(var, i, J_dense0, Nstate) + getGrad_dense(var, i, J_dense, Nstate)) / 2.0;
-    else
+    for(unsigned int i=0; i<Nmeas; i++)
     {
-#warning "FINISH IMPLEMENTING DENSE_PRODUCTS\n"
-      fprintf(stderr, "FINISH IMPLEMENTING DENSE_PRODUCTS\n");
-      exit(1);
-    }
-    double g_sum_abs = fabs(g_reported) + fabs(g_observed);
-    double g_abs_err = fabs(g_reported - g_observed);
+      // estimated gradients at the midpoint between x and x0
+      double g_observed = (x[i] - x0[i]) / GRADTEST_DELTA;
+      double g_reported;
+      if(f != NULL)
+        g_reported = (getGrad(var, i, Jt0) + getGrad(var, i, Jt)) / 2.0;
+      else if(f_dense != NULL)
+        g_reported = (getGrad_dense(var, i, J_dense0, Nstate) + getGrad_dense(var, i, J_dense, Nstate)) / 2.0;
+      else
+      {
+        SAY("ERROR: this should be unreachable");
+        exit(1);
+      }
+      double g_sum_abs = fabs(g_reported) + fabs(g_observed);
+      double g_abs_err = fabs(g_reported - g_observed);
 
-    printf( "%d %d %.6g %.6g %.6g %.6g\n", var, i,
+      printf( "%d %d %.6g %.6g %.6g %.6g\n", var, i,
+              g_reported, g_observed, g_abs_err,
+
+              g_sum_abs == 0.0 ? 0.0 : (g_abs_err / ( g_sum_abs / 2.0 )));
+    }
+  }
+  else
+  {
+    // dense products
+
+    // d(norm2x)/dp = 2 xt J
+    // estimated gradients at the midpoint between x and x0
+    const double g_observed = (norm2x1 - norm2x0) / GRADTEST_DELTA;
+    const double g_reported = Jtx0[var] + Jtx1[var]; // 2 * mean
+    const double g_sum_abs = fabs(g_reported) + fabs(g_observed);
+    const double g_abs_err = fabs(g_reported - g_observed);
+
+    printf( "%d -1 %.6g %.6g %.6g %.6g\n", var,
             g_reported, g_observed, g_abs_err,
 
             g_sum_abs == 0.0 ? 0.0 : (g_abs_err / ( g_sum_abs / 2.0 )));
+
+    // This only kinda works. If J isn't constant, this will not hold
+    // d(Jtx)/dp = JtJ
+    for(unsigned int i=0; i<Nstate; i++)
+    {
+      // estimated gradients at the midpoint between x and x0
+      const double g_observed = (Jtx1[i] - Jtx0[i]) / GRADTEST_DELTA;
+      const double g_reported = (JtJ0[Nstate*i + var] + JtJ1[Nstate*i + var]) / 2.;
+      const double g_sum_abs = fabs(g_reported) + fabs(g_observed);
+      const double g_abs_err = fabs(g_reported - g_observed);
+
+      printf( "%d %d %.6g %.6g %.6g %.6g\n", var, i,
+              g_reported, g_observed, g_abs_err,
+
+              g_sum_abs == 0.0 ? 0.0 : (g_abs_err / ( g_sum_abs / 2.0 )));
+    }
   }
 
   if(f != NULL)
@@ -481,12 +542,13 @@ void _dogleg_testGradient(unsigned int var, const double* p0,
     cholmod_free_sparse(&Jt0, &_cholmod_common);
     cholmod_finish(&_cholmod_common);
   }
-  else if(f_dense != NULL)
-  {
-    free(J_dense);
-    free(J_dense0);
-  }
 
+  free(J_dense);
+  free(J_dense0);
+  free(Jtx0);
+  free(Jtx1);
+  free(JtJ0);
+  free(JtJ1);
   free(x0);
   free(x);
   free(p);
@@ -502,6 +564,7 @@ void dogleg_testGradient(unsigned int var, const double* p0,
   }
   return _dogleg_testGradient(var, p0, Nstate, Nmeas, NJnnz,
                               f, NULL, NULL,
+                              NULL,
                               cookie);
 }
 void dogleg_testGradient_dense(unsigned int var, const double* p0,
@@ -510,14 +573,17 @@ void dogleg_testGradient_dense(unsigned int var, const double* p0,
 {
   return _dogleg_testGradient(var, p0, Nstate, Nmeas, 0,
                               NULL, f, NULL,
+                              NULL,
                               cookie);
 }
 void dogleg_testGradient_dense_products(unsigned int var, const double* p0,
                                         unsigned int Nstate, unsigned int Nmeas,
-                                        dogleg_callback_dense_products_t* f, void* cookie)
+                                        dogleg_callback_dense_products_t* f, void* cookie,
+                                        const dogleg_parameters2_t* parameters)
 {
   return _dogleg_testGradient(var, p0, Nstate, Nmeas, 0,
                               NULL, NULL, f,
+                              parameters,
                               cookie);
 }
 
@@ -2657,8 +2723,7 @@ bool dogleg_getOutliernessFactors( // output
     result = getOutliernessFactors_dense(factors, scale, featureSize, Nfeatures, NoutlierFeatures, point, ctx);
   else if( ctx->solve_type == DOGLEG_DENSE_PRODUCTS )
   {
-#warning "FINISH IMPLEMENTING DENSE_PRODUCTS\n"
-    fprintf(stderr, "FINISH IMPLEMENTING DENSE_PRODUCTS\n");
+    fprintf(stderr, "This isn't yet implemented for DENSE_PRODUCTS\n");
     exit(1);
   }
   else
