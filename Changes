@@ -1,3 +1,9 @@
+libdogleg (0.17) unstable; urgency=medium
+
+  * Added dense-products solver
+
+ -- Dima Kogan <dkogan@debian.org>  Fri, 02 Jan 2026 21:01:59 -0800
+
 libdogleg (0.16)
 
   * The build system has been consolidated, and now uses the mrbuild
