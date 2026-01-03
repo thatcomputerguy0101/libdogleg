@@ -23,7 +23,7 @@ DIST_INCLUDE += \
 LDLIBS += -lcholmod -llapack -lsuitesparseconfig
 LDLIBS += -lm
 
-CFLAGS += -Wall -Wextra -I/usr/include/suitesparse
+CFLAGS += -Wall -Wextra
 
 sample.o: CFLAGS += -I.
 
