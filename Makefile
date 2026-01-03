@@ -20,7 +20,7 @@ DIST_BIN_EXCEPT := *
 DIST_INCLUDE += \
   dogleg.h
 
-LDLIBS += -lcholmod -llapack
+LDLIBS += -lcholmod -llapack -lsuitesparseconfig
 LDLIBS += -lm
 
 CFLAGS += -Wall -Wextra -I/usr/include/suitesparse

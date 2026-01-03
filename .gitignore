@@ -1,0 +1,14 @@
+*~
+*.s
+*.i
+*.o
+*.d
+*.so
+*.so.*
+*.dylib
+*.dylib.*
+*.pyc
+cscope*
+sample
+test-misc
+mrbuild
