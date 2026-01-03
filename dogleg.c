@@ -373,7 +373,7 @@ static double getGrad_dense(unsigned int var, int meas, const double* J, int Nst
 static
 void _dogleg_testGradient(unsigned int var, const double* p0,
                           unsigned int Nstate, unsigned int Nmeas, unsigned int NJnnz,
-// exactly one of these should be non-NULL
+                          // exactly one of these should be non-NULL
                           dogleg_callback_t*                f,
                           dogleg_callback_dense_t*          f_dense,
                           dogleg_callback_dense_products_t* f_dense_products,
