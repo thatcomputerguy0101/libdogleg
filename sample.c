@@ -57,7 +57,7 @@ static void simulate(void)
       REFERENCE_D * x +
       REFERENCE_E * y +
       REFERENCE_F +
-      ((double)random() / (double)RAND_MAX - 0.5) * 1.0; // +- 0.5 units of uniformly-random noise
+      ((double)random() / (double)RAND_MAX - 0.5) * 0.2; // +- 0.2/2 units of uniformly-random noise
   }
 }
 
